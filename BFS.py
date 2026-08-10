@@ -3,7 +3,7 @@ Breadth-First Search (BFS) for the Eight-Queen Problem
 AMCS2104 Fundamentals of Artificial Intelligence
 
 ------------------------------------------------------------------
-Formulation (see Report Section 3.1 "Breadth-First Search (BFS)")
+Formulation (see Report Section 3.2 "Breadth-First Search (BFS)")
 ------------------------------------------------------------------
 State       : a list of column indices, one per row, built up row by
               row. e.g. state = [3, 7, 0] means a queen has been
@@ -14,8 +14,9 @@ Goal test   : len(state) == 8 AND the state matches GOAL_STATE exactly
               (see below for why the goal is one fixed target rather
               than "any" complete arrangement).
 Frontier    : a First-In-First-Out (FIFO) queue, so BFS always expands
-              the shallowest node generated so far, exploring all states
-              at depth d before moving to depth d+1.
+              the shallowest node generated so far, guaranteeing that
+              the first complete state found is also the shortest path
+              to that state.
 
 ------------------------------------------------------------------
 Why one shared GOAL_STATE, instead of stopping at any solution
@@ -33,10 +34,7 @@ SAME specific solution:
 This is exactly Set 1 from Report Section 4.1 "Data Set", which is
 already a conflict-free arrangement, so it is guaranteed reachable.
 Meaning: row 0's queen is in column 3, row 1's queen is in column 7,
-row 2's queen is in column 0, and so on. If a teammate's BFS or Greedy
-code represents a state the other way around (column index -> row
-value), use the transposed version [0, 6, 4, 7, 1, 3, 5, 2] instead --
-same physical board, just written for that indexing convention.
+row 2's queen is in column 0, and so on.
 
 ------------------------------------------------------------------
 How the 10 datasets (Report Section 4.1 "Data Set") are used
@@ -56,10 +54,10 @@ results are meaningfully different and comparable across runs.
 Metrics
 ------------------------------------------------------------------
 nodes_expanded    - TIME complexity metric (total search effort,
-                     corresponds to the theoretical O(b^d)).
+                     corresponds to the theoretical O(b^m)).
 max_queue_size    - SPACE complexity metric, node-count version (peak
                      number of states held in memory at once,
-                     corresponds to the theoretical O(b^d)).
+                     corresponds to the theoretical O(b^m) for BFS).
 peak_memory_kb    - SPACE complexity metric, actual measured version
                      (real bytes allocated by the search, via Python's
                      built-in tracemalloc module, converted to KB).
@@ -139,6 +137,8 @@ def bfs_solve(column_order=None, target=None):
     tracemalloc.start()
 
     queue = deque([[]])      # FIFO frontier, starts with the empty board
+    visited = set()          # BFS needs visited set to avoid cycles
+    visited.add(tuple([]))
     nodes_expanded = 0
     max_queue_size = len(queue)
 
@@ -151,13 +151,17 @@ def bfs_solve(column_order=None, target=None):
                 _, peak_bytes = tracemalloc.get_traced_memory()
                 tracemalloc.stop()
                 return state, nodes_expanded, max_queue_size, peak_bytes / 1024
-            continue  # complete, but not the target -- dead end, backtrack
+            continue  # complete, but not the target -- dead end, continue
 
         # Generate children for the next row in the given column order,
-        # pushing only ones that don't conflict (pruned at generation time).
+        # adding only ones that don't conflict (pruned at generation time).
         for col in column_order:
             if is_safe(state, col):
-                queue.append(state + [col])
+                new_state = state + [col]
+                new_tuple = tuple(new_state)
+                if new_tuple not in visited:
+                    visited.add(new_tuple)
+                    queue.append(new_state)
 
         max_queue_size = max(max_queue_size, len(queue))
 
@@ -239,8 +243,8 @@ def main():
         print(f"\nReached target GOAL_STATE      : {solution == GOAL_STATE}")
         print(f"Nodes expanded   (time metric) : {nodes_expanded}")
         print(f"Time taken       (time metric) : {elapsed_ms:.4f} ms")
-        print(f"Max queue size  (space metric) : {max_queue_size}")
-        print(f"Peak memory     (space metric) : {peak_memory_kb:.2f} KB")
+        print(f"Max queue size  (space metric)  : {max_queue_size}")
+        print(f"Peak memory     (space metric)  : {peak_memory_kb:.2f} KB")
 
         results.append((set_id, initial_conflicts, nodes_expanded, elapsed_ms, max_queue_size, peak_memory_kb))
 
